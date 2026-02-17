@@ -4,7 +4,7 @@ import asyncio
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -32,6 +32,8 @@ from .api.v1 import (
 )
 
 from .monitoring.middleware import PerformanceMonitoringMiddleware
+from .core.auth import authenticate_request
+from .models.auth import AuthenticatedUser
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -290,8 +292,10 @@ async def api_database_health():
 
 # Circuit breaker management endpoints
 @app.post("/api/v1/circuit-breaker/reset")
-async def reset_circuit_breaker():
+async def reset_circuit_breaker(user: AuthenticatedUser = Depends(authenticate_request)):
     """Reset circuit breakers to allow operations to resume"""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
     try:
         from .core.supabase_connection_pool import supabase_pool
         from .core.async_supabase import connection_tracker
@@ -321,8 +325,10 @@ async def reset_circuit_breaker():
 
 
 @app.get("/api/v1/circuit-breaker/status")
-async def circuit_breaker_status():
+async def circuit_breaker_status(user: AuthenticatedUser = Depends(authenticate_request)):
     """Get current circuit breaker status"""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
     try:
         from .core.supabase_connection_pool import supabase_pool
         from .core.async_supabase import connection_tracker
@@ -364,8 +370,13 @@ async def circuit_breaker_status():
 
 
 @app.post("/api/v1/circuit-breaker/configure")
-async def configure_circuit_breaker(request: Request):
+async def configure_circuit_breaker(
+    request: Request,
+    user: AuthenticatedUser = Depends(authenticate_request),
+):
     """Configure circuit breaker thresholds and timeouts"""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
     try:
         body = await request.json()
 
@@ -403,8 +414,10 @@ async def configure_circuit_breaker(request: Request):
 
 # Fallback service management endpoints
 @app.get("/api/v1/fallback/status")
-async def fallback_status():
+async def fallback_status(user: AuthenticatedUser = Depends(authenticate_request)):
     """Get fallback service status and cache information"""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
     try:
         from .core.circuit_breaker_fallback import fallback_service
 
@@ -415,8 +428,10 @@ async def fallback_status():
 
 
 @app.post("/api/v1/fallback/clear-cache")
-async def clear_fallback_cache():
+async def clear_fallback_cache(user: AuthenticatedUser = Depends(authenticate_request)):
     """Clear the fallback service cache"""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
     try:
         from .core.circuit_breaker_fallback import fallback_service
 

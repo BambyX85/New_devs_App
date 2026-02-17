@@ -127,7 +127,9 @@ async def authenticate_request(
                 user = MockUser(payload)
                 
             except JWTError:
-                # If custom JWT fails, try Supabase auth
+                # Reject malformed/forged JWT-style tokens instead of falling back.
+                if token.count(".") == 2:
+                    raise
                 response = supabase.auth.get_user(token)
                 user = response.user
                 
